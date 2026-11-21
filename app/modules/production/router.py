@@ -3,12 +3,13 @@ Production API endpoints for YieldTrace.
 """
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import ProductionRun, BOM
+from app.models import ProductionRun, BOM, User, UserRole
 from app.modules.production.service import ProductionService
 from app.modules.costing.service import CostingService
+from app.modules.auth.service import require_roles
 
 router = APIRouter(prefix="/api/production", tags=["Production"])
 
@@ -69,12 +70,17 @@ def list_boms(db: Session = Depends(get_db)):
 
 
 @router.post("/runs")
-def record_production_run(payload: ProductionRunCreateRequest, db: Session = Depends(get_db)):
+def record_production_run(
+    payload: ProductionRunCreateRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.PRODUCTION_SUPERVISOR])),
+    db: Session = Depends(get_db)
+):
     """
     Record and execute a production run with:
     - Usage variance calculation
     - Packaging reconciliation with mandatory audit warning
     - Append-only stock movements
+    Restricted to Owner, Admin, and Production Supervisor.
     """
     service = ProductionService(db)
     try:

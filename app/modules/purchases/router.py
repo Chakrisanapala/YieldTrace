@@ -3,11 +3,12 @@ Purchases API endpoints for YieldTrace.
 """
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Purchase
+from app.models import Purchase, User, UserRole
 from app.modules.purchases.service import PurchaseService
+from app.modules.auth.service import require_roles
 
 router = APIRouter(prefix="/api/purchases", tags=["Purchases"])
 
@@ -23,13 +24,19 @@ class PurchaseCreateRequest(BaseModel):
     invoice_no: str
     supplier_id: int
     lines: List[PurchaseLineInput]
+    idempotency_token: Optional[str] = None
     notes: Optional[str] = None
 
 
 @router.post("")
-def create_purchase(payload: PurchaseCreateRequest, db: Session = Depends(get_db)):
+def create_purchase(
+    payload: PurchaseCreateRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT])),
+    db: Session = Depends(get_db)
+):
     """
     Record a purchase receipt, updating item WAUC and writing append-only stock movements.
+    Restricted to Owner, Admin, and Accountant.
     """
     service = PurchaseService(db)
     lines_data = [line.model_dump() for line in payload.lines]
@@ -38,6 +45,7 @@ def create_purchase(payload: PurchaseCreateRequest, db: Session = Depends(get_db
             invoice_no=payload.invoice_no,
             supplier_id=payload.supplier_id,
             lines_data=lines_data,
+            idempotency_token=payload.idempotency_token,
             notes=payload.notes
         )
         return {

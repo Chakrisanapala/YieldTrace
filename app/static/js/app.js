@@ -6,10 +6,49 @@
 // Global State
 const state = {
   currentRole: "owner",
+  currentUser: null,
+  token: null,
   currentView: "overview",
   selectedRunId: 1,
   chartInstances: {}
 };
+
+// UI Notification Helper (Bootstrap Toast)
+function showNotification(message, type = "info") {
+  const toastEl = document.getElementById("liveToast");
+  const msgEl = document.getElementById("toast-message");
+  if (!toastEl || !msgEl) {
+    alert(message);
+    return;
+  }
+  msgEl.innerText = message;
+  toastEl.className = `toast align-items-center text-white border-0 shadow bg-${type}`;
+  const toast = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 });
+  toast.show();
+}
+
+// Authenticated Fetch Wrapper
+async function apiFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  if (state.token && !options.headers["Authorization"]) {
+    options.headers["Authorization"] = `Bearer ${state.token}`;
+  }
+  if (!options.headers["Content-Type"] && !(options.body instanceof FormData)) {
+    options.headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(url, options);
+  if (res.status === 403) {
+    const data = await res.json().catch(() => ({ detail: "Access Denied" }));
+    showNotification(`RBAC Restriction: ${data.detail || "Forbidden"}`, "danger");
+    throw new Error(data.detail || "Forbidden");
+  }
+  if (res.status === 401) {
+    showNotification("Authentication required. Please switch roles or re-login.", "warning");
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
 
 // Switch Active Navigation Section
 function switchView(viewId) {
@@ -360,7 +399,18 @@ async function loadInvoicesData() {
 // ----------------------------------------------------
 async function loadPlannerData() {
   try {
-    const res = await fetch("/api/insight/planner/evaluate?finished_good_id=6");
+    let fgId = 6;
+    try {
+      const itemsRes = await fetch("/api/master/items?category=finished_good");
+      const items = await itemsRes.json();
+      if (items && items.length > 0) {
+        fgId = items[0].id;
+      }
+    } catch (e) {
+      console.warn("Could not fetch finished good dynamically, fallback to id 6", e);
+    }
+
+    const res = await fetch(`/api/insight/planner/evaluate?finished_good_id=${fgId}`);
     const data = await res.json();
 
     document.getElementById("planner-product").innerText = data.product_name;
@@ -494,13 +544,354 @@ async function loadSettingsData() {
   }
 }
 
+// ----------------------------------------------------
+// 8. Workflow Actions: Approvals, Dispatches & Modals
+// ----------------------------------------------------
+
+async function approveOrder(orderId) {
+  try {
+    const res = await apiFetch(`/api/sales/orders/${orderId}/approve`, { method: "POST" });
+    if (res.ok) {
+      showNotification(`Order #${orderId} approved successfully for fulfillment.`, "success");
+      loadOrdersData();
+    }
+  } catch (err) {
+    console.error("Order approval error:", err);
+  }
+}
+
+async function dispatchOrder(orderId) {
+  try {
+    const res = await apiFetch(`/api/sales/orders/${orderId}/dispatch`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      let msg = `Order dispatched! Fulfilled: ${data.fulfilled_quantity} pkts.`;
+      if (data.backordered_quantity > 0) {
+        msg += ` Backordered: ${data.backordered_quantity} pkts.`;
+      }
+      msg += ` Invoice #${data.invoice_no} created.`;
+      showNotification(msg, data.backordered_quantity > 0 ? "warning" : "success");
+      loadOrdersData();
+      loadInventoryData();
+      loadInvoicesData();
+      loadDashboardData();
+    }
+  } catch (err) {
+    console.error("Dispatch error:", err);
+  }
+}
+
+function openPaymentModal(invoiceId, invoiceNo, outstanding) {
+  document.getElementById("payment-invoice-id").value = invoiceId;
+  document.getElementById("payment-invoice-no-display").innerText = invoiceNo;
+  document.getElementById("payment-outstanding-display").innerText = `₹${parseFloat(outstanding).toFixed(2)}`;
+  document.getElementById("payment-amount").value = parseFloat(outstanding).toFixed(2);
+  document.getElementById("payment-ref-no").value = `TXN-${Date.now().toString().slice(-6)}`;
+
+  const modalEl = document.getElementById("recordPaymentModal");
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+async function submitPayment() {
+  const invoiceId = parseInt(document.getElementById("payment-invoice-id").value);
+  const amount = parseFloat(document.getElementById("payment-amount").value);
+  const mode = document.getElementById("payment-mode").value;
+  const refNo = document.getElementById("payment-ref-no").value;
+  const notes = document.getElementById("payment-notes").value;
+
+  if (isNaN(amount) || amount <= 0) {
+    alert("Please enter a valid payment amount greater than zero.");
+    return;
+  }
+
+  try {
+    const res = await apiFetch("/api/sales/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        invoice_id: invoiceId,
+        amount: amount,
+        payment_mode: mode,
+        reference_no: refNo,
+        notes: notes
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showNotification(`Payment recorded! Receipt #${data.receipt_no}`, "success");
+      const modalEl = document.getElementById("recordPaymentModal");
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      loadInvoicesData();
+      loadDashboardData();
+    }
+  } catch (err) {
+    console.error("Payment error:", err);
+  }
+}
+
+async function openCreateOrderModal() {
+  try {
+    const custRes = await fetch("/api/master/customers");
+    const customers = await custRes.json();
+    const custSelect = document.getElementById("order-customer-select");
+    custSelect.innerHTML = customers.map(c => `<option value="${c.id}">${c.name} (${c.code} - ${c.state})</option>`).join("");
+
+    const itemRes = await fetch("/api/master/items?category=finished_good");
+    const items = await itemRes.json();
+    const itemSelect = document.getElementById("order-item-select");
+    itemSelect.innerHTML = items.map(i => `<option value="${i.id}" data-price="${i.selling_price}">${i.name} (${i.code}) — ₹${i.selling_price}/unit</option>`).join("");
+
+    document.getElementById("order-number-input").value = `SO-${Date.now().toString().slice(-5)}`;
+    document.getElementById("order-qty-input").value = "50";
+    document.getElementById("order-price-input").value = items.length > 0 ? items[0].selling_price : "50";
+
+    itemSelect.onchange = () => {
+      const selected = itemSelect.options[itemSelect.selectedIndex];
+      if (selected && selected.dataset.price) {
+        document.getElementById("order-price-input").value = selected.dataset.price;
+      }
+    };
+
+    const modalEl = document.getElementById("createOrderModal");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  } catch (err) {
+    console.error("Open create order error:", err);
+  }
+}
+
+async function submitCreateOrder() {
+  const orderNumber = document.getElementById("order-number-input").value.trim();
+  const customerId = parseInt(document.getElementById("order-customer-select").value);
+  const itemId = parseInt(document.getElementById("order-item-select").value);
+  const qty = parseFloat(document.getElementById("order-qty-input").value);
+  const price = parseFloat(document.getElementById("order-price-input").value);
+  const notes = document.getElementById("order-notes-input").value;
+
+  if (!orderNumber || isNaN(customerId) || isNaN(itemId) || isNaN(qty) || qty <= 0 || isNaN(price) || price <= 0) {
+    alert("Please enter valid order details.");
+    return;
+  }
+
+  try {
+    const res = await apiFetch("/api/sales/orders", {
+      method: "POST",
+      body: JSON.stringify({
+        order_number: orderNumber,
+        customer_id: customerId,
+        lines: [{ item_id: itemId, ordered_quantity: qty, unit_price: price }],
+        notes: notes
+      })
+    });
+    if (res.ok) {
+      showNotification(`Order ${orderNumber} created in DRAFT status.`, "success");
+      const modalEl = document.getElementById("createOrderModal");
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      loadOrdersData();
+    }
+  } catch (err) {
+    console.error("Submit order error:", err);
+  }
+}
+
+async function openRecordPurchaseModal() {
+  try {
+    const supRes = await fetch("/api/master/suppliers");
+    const suppliers = await supRes.json();
+    const supSelect = document.getElementById("purchase-supplier-select");
+    supSelect.innerHTML = suppliers.map(s => `<option value="${s.id}">${s.name} (${s.code})</option>`).join("");
+
+    const itemRes = await fetch("/api/master/items");
+    const items = await itemRes.json();
+    const nonFg = items.filter(i => i.category !== "finished_good");
+    const itemSelect = document.getElementById("purchase-item-select");
+    itemSelect.innerHTML = nonFg.map(i => `<option value="${i.id}" data-cost="${i.standard_cost}">${i.name} (${i.code}) [${i.unit}] — Std ₹${i.standard_cost}</option>`).join("");
+
+    document.getElementById("purchase-invoice-input").value = `INV-PO-${Date.now().toString().slice(-5)}`;
+    document.getElementById("purchase-qty-input").value = "50";
+    document.getElementById("purchase-price-input").value = nonFg.length > 0 ? nonFg[0].standard_cost : "45";
+
+    itemSelect.onchange = () => {
+      const selected = itemSelect.options[itemSelect.selectedIndex];
+      if (selected && selected.dataset.cost) {
+        document.getElementById("purchase-price-input").value = selected.dataset.cost;
+      }
+    };
+
+    const modalEl = document.getElementById("recordPurchaseModal");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  } catch (err) {
+    console.error("Open purchase modal error:", err);
+  }
+}
+
+async function submitRecordPurchase() {
+  const invoiceNo = document.getElementById("purchase-invoice-input").value.trim();
+  const supplierId = parseInt(document.getElementById("purchase-supplier-select").value);
+  const itemId = parseInt(document.getElementById("purchase-item-select").value);
+  const qty = parseFloat(document.getElementById("purchase-qty-input").value);
+  const price = parseFloat(document.getElementById("purchase-price-input").value);
+
+  if (!invoiceNo || isNaN(supplierId) || isNaN(itemId) || isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) {
+    alert("Please enter valid purchase details.");
+    return;
+  }
+
+  try {
+    const res = await apiFetch("/api/purchases", {
+      method: "POST",
+      body: JSON.stringify({
+        invoice_no: invoiceNo,
+        supplier_id: supplierId,
+        lines: [{ item_id: itemId, quantity: qty, unit_price: price }]
+      })
+    });
+    if (res.ok) {
+      showNotification(`Purchase receipt ${invoiceNo} recorded! WAUC and Stock updated.`, "success");
+      const modalEl = document.getElementById("recordPurchaseModal");
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      loadPurchasesData();
+      loadInventoryData();
+      loadDashboardData();
+    }
+  } catch (err) {
+    console.error("Submit purchase error:", err);
+  }
+}
+
+async function openRecordProductionModal() {
+  try {
+    const bomsRes = await fetch("/api/production/boms");
+    const boms = await bomsRes.json();
+    const bomSelect = document.getElementById("prod-bom-select");
+    bomSelect.innerHTML = boms.map(b => `<option value="${b.id}">${b.code} — ${b.name} (${b.yield_packets} pkts/batch)</option>`).join("");
+
+    document.getElementById("prod-run-number-input").value = `RUN-PROD-${Date.now().toString().slice(-5)}`;
+    const modalEl = document.getElementById("recordProductionModal");
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  } catch (err) {
+    console.error("Open production modal error:", err);
+  }
+}
+
+async function submitProductionRun() {
+  const runNumber = document.getElementById("prod-run-number-input").value.trim();
+  const bomId = parseInt(document.getElementById("prod-bom-select").value);
+  const flour = parseFloat(document.getElementById("prod-actual-flour").value);
+  const oil = parseFloat(document.getElementById("prod-actual-oil").value);
+  const spice = parseFloat(document.getElementById("prod-actual-spice").value);
+  const pouches = parseFloat(document.getElementById("prod-actual-pouches").value);
+  const cartons = parseFloat(document.getElementById("prod-actual-cartons").value);
+  const goodPackets = parseFloat(document.getElementById("prod-good-packets").value);
+  const damagedPouches = parseFloat(document.getElementById("prod-damaged-pouches").value);
+  const cartonsAvailable = parseFloat(document.getElementById("prod-cartons-available").value);
+
+  if (!runNumber || isNaN(bomId) || isNaN(flour) || isNaN(oil) || isNaN(spice) || isNaN(goodPackets)) {
+    alert("Please enter valid production run details.");
+    return;
+  }
+
+  // Fetch items to match IDs
+  const itemsRes = await fetch("/api/master/items");
+  const items = await itemsRes.json();
+  const flourItem = items.find(i => i.code === "RM-FLOUR") || { id: 1 };
+  const oilItem = items.find(i => i.code === "RM-OIL") || { id: 2 };
+  const spiceItem = items.find(i => i.code === "RM-SPICE-MIX") || { id: 3 };
+  const pouchItem = items.find(i => i.code === "PK-POUCH-200G") || { id: 4 };
+  const cartonItem = items.find(i => i.code === "PK-CARTON-20PK") || { id: 5 };
+
+  const actual_consumptions = [
+    { item_id: flourItem.id, actual_quantity: flour, unit: "kg" },
+    { item_id: oilItem.id, actual_quantity: oil, unit: "litres" },
+    { item_id: spiceItem.id, actual_quantity: spice, unit: "kg" },
+    { item_id: pouchItem.id, actual_quantity: pouches, unit: "pieces" },
+    { item_id: cartonItem.id, actual_quantity: cartons, unit: "cartons" }
+  ];
+
+  const payload = {
+    run_number: runNumber,
+    bom_id: bomId,
+    planned_batches: 1.0,
+    actual_consumptions: actual_consumptions,
+    good_packets_produced: goodPackets,
+    damaged_packets: damagedPouches,
+    cartons_used: cartonsAvailable,
+    carton_capacity: 20,
+    overheads: [
+      { category: "Labour", amount: 1200.0 },
+      { category: "Gas/Electricity", amount: 600.0 }
+    ],
+    notes: "Production run submitted from supervisor interface"
+  };
+
+  try {
+    const res = await apiFetch("/api/production/runs", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      let alertType = "success";
+      let msg = `Batch ${runNumber} completed! Produced: ${data.good_packets_produced} pkts.`;
+      if (data.packaging_warning && data.packaging_warning.warning_code) {
+        msg += ` Packaging Audit Warning: ${data.packaging_warning.unboxed_packets} unboxed packets!`;
+        alertType = "warning";
+      }
+      showNotification(msg, alertType);
+      const modalEl = document.getElementById("recordProductionModal");
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      loadProductionData();
+      loadInventoryData();
+      loadDashboardData();
+    }
+  } catch (err) {
+    console.error("Submit production run error:", err);
+  }
+}
+
 // User Role Switcher for Demo
-function switchDemoRole(role) {
+const roleUsernames = {
+  "owner": "owner",
+  "admin": "admin",
+  "salesman": "sales_lead",
+  "production_supervisor": "prod_supervisor",
+  "accountant": "accountant",
+  "auditor": "auditor"
+};
+
+async function switchDemoRole(role) {
   state.currentRole = role;
-  document.getElementById("current-user-role-badge").innerText = role.toUpperCase();
+  const badge = document.getElementById("current-user-role-badge");
+  if (badge) badge.innerText = role.toUpperCase().replace("_", " ");
+
+  const username = roleUsernames[role] || "owner";
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username_or_email: username,
+        password: "Password@123"
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      state.token = data.access_token;
+      state.currentUser = data.user;
+      showNotification(`Switched active session to ${role.toUpperCase()} (${username})`, "info");
+    } else {
+      console.warn("Could not log in as demo user:", username);
+    }
+  } catch (err) {
+    console.error("Failed to switch demo role:", err);
+  }
 }
 
 // Initialize on DOM Load
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  await switchDemoRole("owner");
   switchView("overview");
 });
+

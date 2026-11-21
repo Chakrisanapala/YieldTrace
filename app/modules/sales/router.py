@@ -3,11 +3,12 @@ Sales, Billing, and Receivables API endpoints for YieldTrace.
 """
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import SalesOrder, Invoice, Customer, Payment
+from app.models import SalesOrder, Invoice, Customer, Payment, User, UserRole
 from app.modules.sales.service import SalesService
+from app.modules.auth.service import require_roles
 
 router = APIRouter(prefix="/api/sales", tags=["Sales & Invoicing"])
 
@@ -34,8 +35,12 @@ class RecordPaymentRequest(BaseModel):
 
 
 @router.post("/orders")
-def create_sales_order(payload: CreateOrderRequest, db: Session = Depends(get_db)):
-    """Create a new sales order in DRAFT status."""
+def create_sales_order(
+    payload: CreateOrderRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.SALESMAN])),
+    db: Session = Depends(get_db)
+):
+    """Create a new sales order in DRAFT status. Restricted to Owner, Admin, Salesman."""
     service = SalesService(db)
     try:
         lines_data = [l.model_dump() for l in payload.lines]
@@ -56,8 +61,12 @@ def create_sales_order(payload: CreateOrderRequest, db: Session = Depends(get_db
 
 
 @router.post("/orders/{order_id}/approve")
-def approve_sales_order(order_id: int, db: Session = Depends(get_db)):
-    """Approve an order for fulfillment."""
+def approve_sales_order(
+    order_id: int,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.SALESMAN])),
+    db: Session = Depends(get_db)
+):
+    """Approve an order for fulfillment. Restricted to Owner, Admin, Salesman."""
     service = SalesService(db)
     try:
         order = service.approve_order(order_id)
@@ -67,7 +76,12 @@ def approve_sales_order(order_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/orders/{order_id}/dispatch")
-def dispatch_sales_order(order_id: int, notes: Optional[str] = None, db: Session = Depends(get_db)):
+def dispatch_sales_order(
+    order_id: int,
+    notes: Optional[str] = None,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.PRODUCTION_SUPERVISOR, UserRole.SALESMAN])),
+    db: Session = Depends(get_db)
+):
     """
     Fulfill and dispatch order based on live inventory.
     Records partial fulfillment, backorders, issues stock moves, and creates GST invoice.
@@ -125,8 +139,12 @@ def list_invoices(db: Session = Depends(get_db)):
 
 
 @router.post("/payments")
-def record_payment(payload: RecordPaymentRequest, db: Session = Depends(get_db)):
-    """Record customer payment against an invoice."""
+def record_payment(
+    payload: RecordPaymentRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT])),
+    db: Session = Depends(get_db)
+):
+    """Record customer payment against an invoice. Restricted to Owner, Admin, Accountant."""
     service = SalesService(db)
     try:
         pmt = service.record_payment(

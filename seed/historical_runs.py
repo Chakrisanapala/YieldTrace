@@ -8,6 +8,12 @@ Guards:
 - Does NOT alter the canonical NIT benchmark run or closing balances of the benchmark run.
 - Populates historical_baselines table when N >= 10.
 """
+import sys
+from pathlib import Path
+root_dir = Path(__file__).resolve().parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.insert(0, str(root_dir))
+
 from datetime import datetime, timedelta, timezone
 import numpy as np
 from sqlalchemy.orm import Session

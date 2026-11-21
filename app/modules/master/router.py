@@ -8,10 +8,11 @@ Covers:
 """
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Item, ItemCategory, Customer, Supplier, UnitConversion
+from app.models import Item, ItemCategory, Customer, Supplier, UnitConversion, User, UserRole
+from app.modules.auth.service import require_roles
 
 router = APIRouter(prefix="/api/master", tags=["Master Data"])
 
@@ -57,8 +58,12 @@ def list_items(category: Optional[ItemCategory] = None, db: Session = Depends(ge
 
 
 @router.post("/items")
-def create_item(payload: ItemCreateRequest, db: Session = Depends(get_db)):
-    """Create a new item in master catalog."""
+def create_item(
+    payload: ItemCreateRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Create a new item in master catalog. Restricted to Owner, Admin."""
     existing = db.query(Item).filter(Item.code == payload.code).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Item code '{payload.code}' already exists.")
@@ -117,8 +122,12 @@ def list_customers(db: Session = Depends(get_db)):
 
 
 @router.post("/customers")
-def create_customer(payload: CustomerCreateRequest, db: Session = Depends(get_db)):
-    """Create a new customer profile."""
+def create_customer(
+    payload: CustomerCreateRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN, UserRole.SALESMAN])),
+    db: Session = Depends(get_db)
+):
+    """Create a new customer profile. Restricted to Owner, Admin, Salesman."""
     existing = db.query(Customer).filter(Customer.code == payload.code).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Customer code '{payload.code}' already exists.")
@@ -172,8 +181,12 @@ def list_suppliers(db: Session = Depends(get_db)):
 
 
 @router.post("/suppliers")
-def create_supplier(payload: SupplierCreateRequest, db: Session = Depends(get_db)):
-    """Create a new supplier profile."""
+def create_supplier(
+    payload: SupplierCreateRequest,
+    current_user: User = Depends(require_roles([UserRole.OWNER, UserRole.ADMIN])),
+    db: Session = Depends(get_db)
+):
+    """Create a new supplier profile. Restricted to Owner, Admin."""
     existing = db.query(Supplier).filter(Supplier.code == payload.code).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"Supplier code '{payload.code}' already exists.")
