@@ -36,6 +36,9 @@ In food manufacturing, standard costing establishes target baselines, but actual
 * **Carton Capacity:** 20 packets per carton
 * **Standard Overheads:** ₹1,800.00 per batch (Labour ₹1,200.00 + Gas/Electricity ₹600.00)
 
+> [!NOTE] Demonstration & Baseline Assumptions
+> The standard material prices (₹40.00/kg flour, ₹110.00/L oil, ₹250.00/kg spice mix, ₹1.50/pouch, ₹25.00/carton), planned BOM recipe quantities (40 kg flour, 10 L oil, 1 kg spice, 200 pouches, 10 cartons), wholesale selling price (₹50.00/packet), and standard batch overheads (₹1,800.00: ₹1,200 labour + ₹600 utilities) are configured demonstration assumptions and operational baselines established in YieldTrace to calculate standard-cost vs. actual-cost variances. They are not official specifications mandated by NIT Trichy.
+
 | BOM Component | Item Code | Standard Qty | Unit | Standard Rate (₹) | Standard Cost (₹) |
 |---|---|---|---|---|---|
 | Flour | `RM-FLOUR` | 40.0 | kg | ₹40.00 | ₹1,600.00 |
@@ -94,11 +97,12 @@ The production supervisor reports actual execution data for 1 planned batch of M
 | Flour | 40.0 kg | 40.0 kg | 0.0 kg | 0.0% | ₹41.875 | ₹1,675.00 |
 | Cooking Oil | 10.0 L | 10.5 L | +0.5 L | **+5.0%** | ₹110.000 | ₹1,155.00 |
 | Spice Mix | 1.0 kg | 1.2 kg | +0.2 kg | **+20.0%** | ₹250.000 | ₹300.00 |
-| Printed Pouches | 200.0 pcs | 194.0 pcs | -6.0 pcs | -3.0% | ₹1.500 | ₹291.00 |
+| Printed Pouches* | 200.0 pcs | 194.0 pcs | -6.0 pcs | -3.0% | ₹1.500 | ₹291.00 |
 | Cartons | 10.0 cartons | 9.0 cartons | -1.0 carton | -10.0% | ₹25.000 | ₹225.00 |
-| Damaged Pouches | 0.0 pcs | 6.0 pcs | +6.0 pcs | N/A | ₹1.500 | ₹9.00 |
 | Actual Overheads | ₹1,800.00 | ₹1,800.00 | ₹0.00 | 0.0% | N/A | ₹1,800.00 |
-| **Total Batch Cost** | | | | | | **₹5,455.00** |
+| **Total Batch Cost** | | | | | | **₹5,446.00** |
+
+*\*Note: Actual pouch consumption is 194.0 pcs (188 good packets + 6 damaged pouches = 194 pcs). The 6 damaged pouches are tracked for quality forensics and scrap reporting, but are not added as a separate financial penalty to prevent double-counting.*
 
 #### Finished Goods Output & Yield Variance:
 * **Standard Expected Output:** 200.0 packets

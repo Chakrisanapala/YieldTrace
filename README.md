@@ -21,7 +21,7 @@
 12. [Database Seeding & Test Execution](#12-database-seeding--test-execution)
 13. [Demo User Accounts & RBAC](#13-demo-user-accounts--rbac)
 14. [Limitations & Future Enhancements](#14-limitations--future-enhancements)
-15. [License & Authorship](#15-license--authorship)
+15. [Authorship & Academic Submission](#15-authorship--academic-submission)
 
 ---
 
@@ -177,6 +177,10 @@ The Cost Bridge links target baselines to actual incurred expenditures:
 
 $$\text{Actual Batch Cost} = \text{Standard BOM Cost} + \text{Material Price Variance} + \text{Material Usage Variance} + \text{Overhead Variance}$$
 
+> [!NOTE] Specification vs. Demonstration Baseline Assumptions
+> The canonical physical scenario specified by NIT Tiruchirappalli defines the operational test case: opening inventory, 60 kg flour purchase at ₹45.00/kg, a 1-batch production run producing 188 good packets with 6 damaged pouches and 9 cartons issued (leaving 8 unboxed packets), and dispatches for Retailer A (150 pkts) and Distributor B (120 pkts ordered, 88 fulfilled, 32 backordered).
+> To enable standard costing and variance forensics, YieldTrace incorporates standard manufacturing cost baselines (standard material prices: ₹40.00/kg flour, ₹110.00/L oil, ₹250.00/kg spice mix, ₹1.50/pouch, ₹25.00/carton; planned recipe quantities: 40 kg flour, 10 L oil, 1 kg spice, 200 pouches, 10 cartons; standard batch overhead: ₹1,800.00 comprising ₹1,200 labour and ₹600 utilities; and wholesale selling price: ₹50.00/packet). These configured standard prices, quantities, and overheads are demonstration assumptions designed for realistic standard-cost variance accounting, rather than official specifications mandated by NIT Trichy.
+
 ### Exact Mathematical Reconciliation Proof (Batch #RUN-NIT-MURUKKU-001):
 * **Standard Baseline Cost:**
   $$40\text{ kg flour @ ₹40} + 10\text{ L oil @ ₹110} + 1\text{ kg spice @ ₹250} + 200\text{ pouches @ ₹1.50} + 10\text{ cartons @ ₹25} + ₹1,800\text{ overhead} = \mathbf{₹5,300.00}$$
@@ -200,7 +204,7 @@ $$\text{Actual Batch Cost} = \text{Standard BOM Cost} + \text{Material Price Var
 
 ## 9. Canonical NIT Benchmark Verification
 
-Tested and validated against the official NIT Tiruchirappalli benchmark:
+Tested and validated against the canonical NIT Tiruchirappalli benchmark physical scenario using the configured demonstration cost baselines:
 
 | Metric / Operational Step | Canonical Specification | YieldTrace Result | Verification Status |
 | :--- | :--- | :--- | :--- |
@@ -282,8 +286,13 @@ cd YieldTrace
 # Windows (PowerShell):
 python -m venv venv
 .\venv\Scripts\Activate.ps1
+# (Note: If script execution is restricted on Windows PowerShell, run:
+# Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process)
 
-# Linux / macOS:
+# Windows (Command Prompt - cmd.exe):
+venv\Scripts\activate.bat
+
+# Linux / macOS (bash / zsh):
 python3 -m venv venv
 source venv/bin/activate
 
@@ -292,6 +301,10 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # 4. Configure environment (optional - defaults to local SQLite)
+# Windows (PowerShell):
+Copy-Item .env.example .env
+
+# Linux / macOS / Git Bash:
 cp .env.example .env
 ```
 
@@ -324,6 +337,17 @@ http://localhost:8000
 ```
 Interactive Swagger API documentation is available at `http://localhost:8000/docs`.
 
+#### Verified Quick-Login Demo Credentials:
+All demo accounts use the standard seed password `Password@123`:
+* **Administrator:** `admin` / `Password@123`
+* **Production Supervisor:** `prod_supervisor` / `Password@123`
+* **Sales Lead:** `sales_lead` / `Password@123`
+* **Accountant:** `accountant` / `Password@123`
+* **Auditor:** `auditor` / `Password@123`
+* **Managing Director (Owner):** `owner` / `Password@123`
+
+*(Note: Users can also switch active roles with a single click using the live Role Switcher dropdown in the top navigation bar).*
+
 ---
 
 ## 13. Demo User Accounts & RBAC
@@ -355,12 +379,12 @@ YieldTrace enforces zero-trust backend authorization across 6 roles:
 
 ---
 
-## 15. License & Authorship
+## 15. Authorship & Academic Submission
 
 Developed for the **National Institute of Technology Tiruchirappalli (NIT Trichy), Centre for Digital Infrastructure, Winter Internship 2026**.
 
 * **Author:** Sanapala Chakradhar
-* **License:** MIT License
+* **Academic Submission:** Centre for Digital Infrastructure, NIT Tiruchirappalli
 * **Repository:** [https://github.com/Chakrisanapala/YieldTrace.git](https://github.com/Chakrisanapala/YieldTrace.git)
 
 *Every gram accounted for. Every deviation explained.*

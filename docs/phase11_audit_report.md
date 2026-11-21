@@ -50,7 +50,7 @@ As mandated by engineering standards, all audit items are classified into four c
 | **Phase C: Security** | Unauthenticated Mutation Blocks | **Verified** | Endpoints reject missing/invalid Bearer tokens with HTTP 401 Unauthorized. |
 | **Phase C: Security** | Session Token Revocation | **Verified** | Logout nullifies active session token in database. |
 | **Phase C: Security** | Production PostgreSQL Cluster | **Requires External Config** | System defaults to local SQLite; PostgreSQL requires `DATABASE_URL` environment configuration. |
-| **Phase D: Financial** | NIT Murukku Benchmark Costing | **Verified** | Flour WAUC recomputed to ₹41.875/kg; batch actual cost matches ₹5,286.88. |
+| **Phase D: Financial** | NIT Murukku Benchmark Costing | **Verified** | Flour WAUC recomputed to ₹41.875/kg; batch actual cost matches ₹5,446.00. |
 | **Phase D: Financial** | Cost Waterfall Reconciliation | **Verified** | Standard Baseline + Price Var + Usage Var + Overhead Var = Actual Cost (₹0.00 discrepancy). |
 | **Phase D: Financial** | GST Calculation (Intra vs Inter) | **Verified** | Intra-state splits into CGST (2.5%) + SGST (2.5%); Inter-state applies IGST (5.0%). |
 | **Phase D: Financial** | Backorder Allocation | **Verified** | Distributor B order for 120 packets fulfilled to 88 packets; 32 backordered. |

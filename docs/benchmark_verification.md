@@ -9,6 +9,10 @@
 
 ## 1. Input Values
 
+> [!NOTE] Benchmark Specification vs. Configured Demonstration Assumptions
+> The canonical scenario specified by NIT Tiruchirappalli defines the physical material flows: opening stock quantities, purchase of 60 kg flour at ₹45/kg, production run producing 188 good packets with 6 damaged pouches and 9 cartons issued (leaving 8 unboxed packets), Retailer A order of 150 packets, and Distributor B order of 120 packets (88 fulfilled, 32 backordered).
+> To enable standard-vs-actual variance forensics and mathematical cost waterfall analysis, YieldTrace incorporates standard manufacturing cost baselines (standard material prices: ₹40.00/kg flour, ₹110.00/L oil, ₹250.00/kg spice, ₹1.50/pouch, ₹25.00/carton; standard recipe quantities: 40 kg flour, 10 L oil, 1 kg spice, 200 pouches, 10 cartons; wholesale selling price: ₹50.00/packet; and standard batch overheads: ₹1,800.00 comprising ₹1,200 labour and ₹600 utilities). These configured standard prices, quantities, and overheads are demonstration assumptions designed for realistic variance accounting, not official specifications mandated by NIT Trichy.
+
 ### 1.1 Canonical Initial Stock
 | Item Code | Description | Category | Unit | Initial Quantity | Unit Cost | Total Valuation |
 | :--- | :--- | :--- | :--- | ---: | ---: | ---: |
@@ -111,6 +115,17 @@
 | Unboxed Finished Packets | **8 packets** | **8 packets** | Packaging reconciliation |
 | Packaging Audit Warning | **Active Warning** | **Active Warning** | `audit_logs` table |
 | Cost Waterfall Reconciliation | **₹0.00 Difference** | **₹0.00 Difference** | `Decimal` bridge assertion |
+
+### 2.1 Cost Waterfall Mathematical Bridge Breakdown
+* **Standard BOM Baseline Cost (Planned):** ₹5,300.00
+  * Materials: Flour (₹1,600) + Oil (₹1,100) + Spice Mix (₹250) + Pouches (₹300) + Cartons (₹250) = ₹3,500.00
+  * Overheads: Labour (₹1,200) + Power (₹600) = ₹1,800.00
+* **Price Variance:** $(41.875 - 40.00) \times 40.0\text{ kg} = \mathbf{+₹75.00}$ (Flour WAUC effect)
+* **Usage Variance:** $(10.5 - 10) \times 110 + (1.2 - 1) \times 250 + (194 - 200) \times 1.50 + (9 - 10) \times 25 = +55 + 50 - 9 - 25 = \mathbf{+₹71.00}$
+* **Overhead Variance:** $₹1,800.00 - ₹1,800.00 = \mathbf{₹0.00}$
+* **Total Variance:** $+₹75.00 + ₹71.00 + ₹0.00 = \mathbf{+₹146.00}$
+* **Actual Incurred Batch Cost:** $₹5,300.00 + ₹146.00 = \mathbf{₹5,446.00}$
+* **Mathematical Discrepancy:** $₹5,446.00 - ₹5,446.00 = \mathbf{₹0.0000}$ (Exact paisa match)
 
 ---
 
