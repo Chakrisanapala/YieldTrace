@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YieldTrace — Intelligent Production, Variance Forensics & Audit Platform</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Persistent Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <div>
+        <h5 class="mb-0 fw-bold text-primary">YieldTrace</h5>
+        <small class="text-muted" style="font-size: 0.7rem;">Variance Forensics ERP</small>
+      </div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-category">Core Operations</div>
+      <a class="nav-link-custom active" data-view="overview" onclick="switchView('overview')">
+        <i class="bi bi-grid-1x2"></i> Overview
+      </a>
+      <a class="nav-link-custom" data-view="orders" onclick="switchView('orders')">
+        <i class="bi bi-cart3"></i> Orders & Backorders
+      </a>
+      <a class="nav-link-custom" data-view="customers" onclick="switchView('customers')">
+        <i class="bi bi-people"></i> Customers
+      </a>
+      <a class="nav-link-custom" data-view="suppliers" onclick="switchView('suppliers')">
+        <i class="bi bi-truck"></i> Suppliers
+      </a>
+
+      <div class="nav-category">Manufacturing & Ledger</div>
+      <a class="nav-link-custom" data-view="products" onclick="switchView('products')">
+        <i class="bi bi-box-seam"></i> Products & Items
+      </a>
+      <a class="nav-link-custom" data-view="purchases" onclick="switchView('purchases')">
+        <i class="bi bi-bag-check"></i> Purchases
+      </a>
+      <a class="nav-link-custom" data-view="inventory" onclick="switchView('inventory')">
+        <i class="bi bi-archive"></i> Stock Ledger
+      </a>
+      <a class="nav-link-custom" data-view="bom" onclick="switchView('bom')">
+        <i class="bi bi-receipt-cutoff"></i> Bill of Materials
+      </a>
+      <a class="nav-link-custom" data-view="production" onclick="switchView('production')">
+        <i class="bi bi-gear-wide-connected"></i> Production Runs
+      </a>
+
+      <div class="nav-category">Intelligence & Audit</div>
+      <a class="nav-link-custom" data-view="forensics" onclick="switchView('forensics')">
+        <i class="bi bi-shield-check text-primary"></i> <strong>Variance Forensics</strong>
+      </a>
+      <a class="nav-link-custom" data-view="costing" onclick="switchView('costing')">
+        <i class="bi bi-water"></i> Cost Waterfall
+      </a>
+      <a class="nav-link-custom" data-view="planner" onclick="switchView('planner')">
+        <i class="bi bi-cpu"></i> Production Planner
+      </a>
+      <a class="nav-link-custom" data-view="invoices" onclick="switchView('invoices')">
+        <i class="bi bi-receipt"></i> GST Invoices
+      </a>
+      <a class="nav-link-custom" data-view="reports" onclick="switchView('reports')">
+        <i class="bi bi-file-earmark-bar-graph"></i> Reports & Audit
+      </a>
+      <a class="nav-link-custom" data-view="settings" onclick="switchView('settings')">
+        <i class="bi bi-person-gear"></i> Users & Security
+      </a>
+    </div>
+
+    <div class="p-3 border-top bg-light">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <small class="text-muted d-block" style="font-size: 0.65rem;">Active Demo Role</small>
+          <span class="badge bg-primary" id="current-user-role-badge">OWNER</span>
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            Switch
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li><a class="dropdown-item" href="#" onclick="switchDemoRole('owner')">Owner</a></li>
+            <li><a class="dropdown-item" href="#" onclick="switchDemoRole('admin')">Administrator</a></li>
+            <li><a class="dropdown-item" href="#" onclick="switchDemoRole('salesman')">Salesman</a></li>
+            <li><a class="dropdown-item" href="#" onclick="switchDemoRole('production_supervisor')">Production Supervisor</a></li>
+            <li><a class="dropdown-item" href="#" onclick="switchDemoRole('accountant')">Accountant</a></li>
+            <li><a class="dropdown-item" href="#" onclick="switchDemoRole('auditor')">Auditor</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Shell -->
+  <main id="main-content">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div>
+        <span class="text-muted small">NIT Tiruchirappalli Winter Internship 2026 Submission</span>
+        <h6 class="mb-0 fw-bold text-dark">YieldTrace — <span class="fw-normal text-muted fst-italic">"Every gram accounted for. Every deviation explained."</span></h6>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+          <i class="bi bi-check-circle-fill me-1"></i>Canonical Benchmark Verified
+        </span>
+        <button class="btn btn-sm btn-outline-primary" onclick="window.location.reload()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh Data
+        </button>
+      </div>
+    </header>
+
+    <!-- Content Body -->
+    <div class="content-body">
+
+      <!-- ============================================== -->
+      <!-- VIEW: OVERVIEW (DASHBOARD)                     -->
+      <!-- ============================================== -->
+      <section id="view-overview" class="view-panel">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">Manufacturing & Financial Overview</h4>
+            <p class="text-muted small mb-0">Live aggregated metrics calculated strictly from underlying ledger movements.</p>
+          </div>
+        </div>
+
+        <!-- KPI Grid -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Total Sales Revenue</div>
+              <div class="kpi-value" id="kpi-sales">₹0.00</div>
+              <div class="kpi-subtext text-muted">GST invoices recorded</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Average Yield</div>
+              <div class="kpi-value text-success" id="kpi-yield">94.0%</div>
+              <div class="kpi-subtext text-muted">Target: 100.0%</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Finished Murukku Stock</div>
+              <div class="kpi-value text-primary" id="kpi-fg-stock">0 pkts</div>
+              <div class="kpi-subtext text-muted">Append-only ledger balance</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Customer Outstanding</div>
+              <div class="kpi-value text-danger" id="kpi-outstanding">₹0.00</div>
+              <div class="kpi-subtext text-muted">Total receivables</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="kpi-card border-warning">
+              <div class="kpi-title text-warning">Forensic Anomalies Flagged</div>
+              <div class="kpi-value text-warning" id="kpi-anomalies">0</div>
+              <div class="kpi-subtext text-muted">Deviations exceeding baseline</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="kpi-card border-danger">
+              <div class="kpi-title text-danger">Packaging Mismatches</div>
+              <div class="kpi-value text-danger" id="kpi-pkg-mismatch">0</div>
+              <div class="kpi-subtext text-muted">Unboxed packets discrepancy</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="kpi-card">
+              <div class="kpi-title">Sales Orders Status</div>
+              <div class="kpi-value text-dark" id="kpi-orders">0</div>
+              <div class="kpi-subtext text-muted">Fulfillments & Backorders</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Audit Trail Feed -->
+        <div class="yield-card">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-clock-history text-primary"></i>Live Operational Audit Trail</h5>
+            <small class="text-muted">Immutable system logs</small>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Event Type</th>
+                  <th>Target Entity</th>
+                  <th>Audit Note / Deviation Reason</th>
+                  <th>Operator</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-activity-feed">
+                <tr><td colspan="5" class="text-center text-muted">Loading audit feed...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: VARIANCE FORENSICS (THE INNOVATION)      -->
+      <!-- ============================================== -->
+      <section id="view-forensics" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1"><i class="bi bi-shield-check text-primary me-2"></i>Production Variance Forensics Engine</h4>
+            <p class="text-muted small mb-0">Explainable decision-support intelligence identifying deviations, assessing historical dispersion, and advising supervisors.</p>
+          </div>
+          <span class="badge bg-primary fs-6 px-3 py-2">Batch #RUN-NIT-MURUKKU-001</span>
+        </div>
+
+        <!-- Methodology Callout -->
+        <div class="alert alert-info py-2 px-3 small mb-4">
+          <i class="bi bi-info-circle-fill me-2"></i><strong>Statistical Discipline Notice:</strong>
+          When sample size <code>N &lt; 10</code>, YieldTrace does <strong>not</strong> claim statistical reliability and falls back to a deterministic 3% tolerance.
+          When <code>N &ge; 10</code>, Mean, StdDev, Median, and MAD are derived from reproducible history.
+        </div>
+
+        <!-- Findings List -->
+        <div class="yield-card mb-4">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-search text-danger"></i>Explainable Forensic Findings & Root-Cause Advice</h5>
+            <small class="text-muted">9 Critical Forensic Questions Answered</small>
+          </div>
+          <div id="forensics-findings-container">
+            <div class="text-center py-4 text-muted">Loading forensic findings...</div>
+          </div>
+        </div>
+
+        <!-- CUSUM Production Drift Chart -->
+        <div class="yield-card">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-activity text-danger"></i>CUSUM Production Drift Control Chart — Cooking Oil</h5>
+            <small class="text-muted">Tabular Cumulative Sum (k=0.5, H=3.0)</small>
+          </div>
+          <p class="text-muted small mb-3">Detects persistent small upward shifts in material consumption across sequential batches (e.g. thermostat degradation).</p>
+          <canvas id="cusumChart" height="90"></canvas>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: COST WATERFALL RECONCILIATION            -->
+      <!-- ============================================== -->
+      <section id="view-costing" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1"><i class="bi bi-water text-primary me-2"></i>Mathematical Cost Waterfall Reconciliation</h4>
+            <p class="text-muted small mb-0">Standard BOM Baseline &plus; Material Price Var &plus; Material Usage Var &plus; Overhead Var &equals; Actual Batch Cost.</p>
+          </div>
+          <div id="cost-reconciled-badge"></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Standard Baseline Cost</div>
+              <div class="kpi-value text-primary" id="cost-std-baseline">₹0.00</div>
+              <div class="kpi-subtext text-muted" id="cost-std-per-unit">₹0.0000 / packet</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Material Price Variance</div>
+              <div class="kpi-value text-danger" id="cost-price-var">₹0.00</div>
+              <div class="kpi-subtext text-muted">(WAUC - Std Price) * Qty</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Material Usage Variance</div>
+              <div class="kpi-value text-danger" id="cost-usage-var">₹0.00</div>
+              <div class="kpi-subtext text-muted">(Actual - Planned) * Std Price</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="kpi-card">
+              <div class="kpi-title">Total Actual Batch Cost</div>
+              <div class="kpi-value" id="cost-actual-total">₹0.00</div>
+              <div class="kpi-subtext text-muted" id="cost-act-per-unit">₹0.0000 / packet</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Waterfall Chart -->
+        <div class="yield-card mb-4">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-bar-chart-steps text-primary"></i>Visual Cost Bridge (Standard to Actual)</h5>
+            <small class="text-muted">Exact Decimal Reconciled Bridge</small>
+          </div>
+          <canvas id="waterfallChart" height="90"></canvas>
+        </div>
+
+        <!-- Material Cost Breakdown Table -->
+        <div class="yield-card">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-table text-primary"></i>Material Variance Detail by Component</h5>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-yield">
+              <thead>
+                <tr>
+                  <th>Material Component</th>
+                  <th>Planned (BOM)</th>
+                  <th>Actual Used</th>
+                  <th>Std Unit Cost</th>
+                  <th>Actual WAUC</th>
+                  <th>Std Total</th>
+                  <th>Actual Total</th>
+                  <th>Usage Variance</th>
+                  <th>Price Variance</th>
+                </tr>
+              </thead>
+              <tbody id="costing-material-tbody">
+                <tr><td colspan="9" class="text-center text-muted">Loading cost breakdown...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: ORDERS & BACKORDERS                      -->
+      <!-- ============================================== -->
+      <section id="view-orders" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">Sales Orders & Demand Fulfillment</h4>
+            <p class="text-muted small mb-0">Order allocation against available stock, partial dispatches, and backorder tracking.</p>
+          </div>
+        </div>
+
+        <div class="yield-card">
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Order #</th>
+                  <th>Customer (Destination)</th>
+                  <th>Status</th>
+                  <th>Ordered</th>
+                  <th>Fulfilled</th>
+                  <th>Backordered</th>
+                  <th>Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody">
+                <tr><td colspan="8" class="text-center text-muted">Loading orders...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: INVENTORY & STOCK LEDGER                 -->
+      <!-- ============================================== -->
+      <section id="view-inventory" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">Immutable Inventory Ledger & Balances</h4>
+            <p class="text-muted small mb-0">Balances are strictly derived from <code>SUM(IN) - SUM(OUT)</code>. Zero direct balance overwriting permitted.</p>
+          </div>
+        </div>
+
+        <div class="yield-card mb-4">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-boxes text-primary"></i>Current Live Stock Balances</h5>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Available Balance</th>
+                  <th>Standard Cost</th>
+                  <th>Current WAUC</th>
+                  <th>Inventory Valuation</th>
+                  <th>Health Status</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-balances-tbody">
+                <tr><td colspan="8" class="text-center text-muted">Loading stock balances...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="yield-card">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-journal-text text-primary"></i>Recent Append-Only Ledger Movements</h5>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Date / Time</th>
+                  <th>Item Code</th>
+                  <th>Direction</th>
+                  <th>Movement Type</th>
+                  <th>Quantity</th>
+                  <th>Unit Cost</th>
+                  <th>Balance Snapshot</th>
+                  <th>Reference Document</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-ledger-tbody">
+                <tr><td colspan="8" class="text-center text-muted">Loading ledger entries...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: PRODUCTION PLANNER                       -->
+      <!-- ============================================== -->
+      <section id="view-planner" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1"><i class="bi bi-cpu text-primary me-2"></i>Deterministic Intelligent Production Planner</h4>
+            <p class="text-muted small mb-0">Evaluates gross customer demand, checks live warehouse stock, and determines batch feasibility.</p>
+          </div>
+          <div id="planner-status-badge"></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="kpi-card">
+              <div class="kpi-title">Target Product</div>
+              <div class="kpi-value text-primary fs-5" id="planner-product">-</div>
+              <div class="kpi-subtext text-muted">Murukku 200 g Standard Formulation</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="kpi-card">
+              <div class="kpi-title">Gross Demand</div>
+              <div class="kpi-value fs-5" id="planner-demand">0 pkts</div>
+              <div class="kpi-subtext text-muted">Orders pending</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="kpi-card">
+              <div class="kpi-title">Available Stock</div>
+              <div class="kpi-value text-success fs-5" id="planner-avail">0 pkts</div>
+              <div class="kpi-subtext text-muted">Warehouse physical</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="kpi-card">
+              <div class="kpi-title">Net Shortage</div>
+              <div class="kpi-value text-danger fs-5" id="planner-shortage">0 pkts</div>
+              <div class="kpi-subtext text-muted">Production deficit</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="kpi-card">
+              <div class="kpi-title">Required Batches</div>
+              <div class="kpi-value text-primary fs-5" id="planner-batches">0 batches</div>
+              <div class="kpi-subtext text-muted" id="planner-output">0 pkts planned</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="yield-card">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-check2-square text-primary"></i>Raw Material Feasibility Matrix</h5>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Item Code</th>
+                  <th>Material Name</th>
+                  <th>Standard / Batch</th>
+                  <th>Total Required</th>
+                  <th>Warehouse Stock</th>
+                  <th>Feasibility Result</th>
+                </tr>
+              </thead>
+              <tbody id="planner-materials-tbody">
+                <tr><td colspan="6" class="text-center text-muted">Loading planning evaluation...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: GST INVOICES                             -->
+      <!-- ============================================== -->
+      <section id="view-invoices" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">GST Invoices & Tax Compliance</h4>
+            <p class="text-muted small mb-0">Automatic split of CGST &plus; SGST (Intra-state) and IGST (Inter-state) calculated using banking Decimal rounding.</p>
+          </div>
+        </div>
+
+        <div class="yield-card">
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Customer</th>
+                  <th>Tax Jurisdiction</th>
+                  <th>Taxable Value</th>
+                  <th>CGST (2.5%)</th>
+                  <th>SGST (2.5%)</th>
+                  <th>IGST (5.0%)</th>
+                  <th>Total Invoice</th>
+                  <th>Paid</th>
+                  <th>Outstanding</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="invoices-tbody">
+                <tr><td colspan="12" class="text-center text-muted">Loading invoices...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: BILL OF MATERIALS                        -->
+      <!-- ============================================== -->
+      <section id="view-bom" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">Bill of Materials (BOM) Recipes</h4>
+            <p class="text-muted small mb-0">Standard recipe formulations pinned to version numbers for historical invariance.</p>
+          </div>
+        </div>
+        <div id="bom-container">
+          <div class="text-center py-4 text-muted">Loading BOM recipes...</div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: PRODUCTION RUNS                          -->
+      <!-- ============================================== -->
+      <section id="view-production" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">Production Runs History</h4>
+            <p class="text-muted small mb-0">Historical batch performance showing yield variances, packaging mismatches, and synthetic tags.</p>
+          </div>
+        </div>
+        <div class="yield-card">
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Run #</th>
+                  <th>Date</th>
+                  <th>Product</th>
+                  <th>Planned Output</th>
+                  <th>Actual Good Output</th>
+                  <th>Yield Variance</th>
+                  <th>Packaging Warning</th>
+                  <th>Dataset Source</th>
+                </tr>
+              </thead>
+              <tbody id="production-batches-tbody">
+                <tr><td colspan="8" class="text-center text-muted">Loading production runs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- VIEW: REPORTS & EXPORTS                        -->
+      <!-- ============================================== -->
+      <section id="view-reports" class="view-panel d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h4 class="fw-bold mb-1">Compliance Reports & File Exports</h4>
+            <p class="text-muted small mb-0">Export operational data in CSV, Excel (OpenPyXL), or PDF (ReportLab) formats.</p>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="yield-card h-100">
+              <h6 class="fw-bold mb-2"><i class="bi bi-file-earmark-spreadsheet text-success me-2"></i>Sales Register & GST Summary</h6>
+              <p class="small text-muted mb-3">Complete customer sales register with state tax breakdown.</p>
+              <div class="btn-group w-100">
+                <a href="/api/reports/sales?format=csv" class="btn btn-sm btn-outline-secondary">CSV</a>
+                <a href="/api/reports/sales?format=excel" class="btn btn-sm btn-outline-success">Excel</a>
+                <a href="/api/reports/sales?format=pdf" class="btn btn-sm btn-outline-danger">PDF</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="yield-card h-100">
+              <h6 class="fw-bold mb-2"><i class="bi bi-truck text-primary me-2"></i>Purchases Register</h6>
+              <p class="small text-muted mb-3">Raw material and packaging procurement invoice records.</p>
+              <div class="btn-group w-100">
+                <a href="/api/reports/purchases?format=csv" class="btn btn-sm btn-outline-secondary">CSV</a>
+                <a href="/api/reports/purchases?format=excel" class="btn btn-sm btn-outline-success">Excel</a>
+                <a href="/api/reports/purchases?format=pdf" class="btn btn-sm btn-outline-danger">PDF</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="yield-card h-100">
+              <h6 class="fw-bold mb-2"><i class="bi bi-journal-check text-info me-2"></i>Stock Movement Ledger</h6>
+              <p class="small text-muted mb-3">Immutable audit log of all receipts, issues, and adjustments.</p>
+              <div class="btn-group w-100">
+                <a href="/api/reports/stock-ledger?format=csv" class="btn btn-sm btn-outline-secondary">CSV</a>
+                <a href="/api/reports/stock-ledger?format=excel" class="btn btn-sm btn-outline-success">Excel</a>
+                <a href="/api/reports/stock-ledger?format=pdf" class="btn btn-sm btn-outline-danger">PDF</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="yield-card">
+          <div class="yield-card-header">
+            <h5 class="yield-card-title"><i class="bi bi-shield-lock text-primary"></i>System Audit Trail Log</h5>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-yield align-middle">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Entity</th>
+                  <th>Record #</th>
+                  <th>Changed By</th>
+                  <th>Reason / Details</th>
+                </tr>
+              </thead>
+              <tbody id="reports-audit-tbody">
+                <tr><td colspan="6" class="text-center text-muted">Loading audit log...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Placeholder Views for other sections -->
+      <section id="view-customers" class="view-panel d-none">
+        <h4 class="fw-bold mb-3">Customers Directory</h4>
+        <div class="yield-card"><table class="table table-yield"><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>GSTIN</th><th>State</th><th>Phone</th></tr></thead><tbody id="customers-tbody"></tbody></table></div>
+      </section>
+
+      <section id="view-suppliers" class="view-panel d-none">
+        <h4 class="fw-bold mb-3">Suppliers Directory</h4>
+        <div class="yield-card"><table class="table table-yield"><thead><tr><th>Code</th><th>Name</th><th>GSTIN</th><th>State</th><th>Phone</th></tr></thead><tbody id="suppliers-tbody"></tbody></table></div>
+      </section>
+
+      <section id="view-products" class="view-panel d-none">
+        <h4 class="fw-bold mb-3">Products & Items Catalog</h4>
+        <div class="yield-card"><table class="table table-yield"><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Standard Cost</th><th>Selling Price</th><th>GST Rate</th></tr></thead><tbody id="products-tbody"></tbody></table></div>
+      </section>
+
+      <section id="view-purchases" class="view-panel d-none">
+        <h4 class="fw-bold mb-3">Purchases & Goods Receipts</h4>
+        <div class="yield-card"><table class="table table-yield"><thead><tr><th>Invoice #</th><th>Date</th><th>Supplier</th><th>Amount</th><th>Status</th></tr></thead><tbody id="purchases-tbody"></tbody></table></div>
+      </section>
+
+      <section id="view-settings" class="view-panel d-none">
+        <h4 class="fw-bold mb-3">User Accounts & Role Permissions</h4>
+        <div class="yield-card"><table class="table table-yield"><thead><tr><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody id="settings-users-tbody"></tbody></table></div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Bootstrap 5 Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- App JS -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

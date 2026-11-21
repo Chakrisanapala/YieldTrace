@@ -1,10 +1,15 @@
 """
-Inventory service for YieldTrace.
+Inventory Service for YieldTrace.
 
-CRITICAL DESIGN RULE:
-We NEVER let users directly overwrite stock balances.
-Balances are calculated from append-only stock movements (stock_moves),
-with reconciliation checks and Weighted Average Unit Cost (WAUC) tracking.
+CRITICAL ARCHITECTURAL RULES:
+1. Append-only stock movement ledger: Stock balances are NEVER directly updated or overwritten.
+   Balances are derived dynamically from SUM(IN) - SUM(OUT).
+2. Strict negative inventory prevention: Any operational issue or dispatch that exceeds
+   available stock will raise an InsufficientStockError.
+3. Auditable adjustments & reversals: Stock corrections create explicit, traceable
+   reversal or adjustment movements with mandatory reason logging.
+4. Weighted Average Unit Cost (WAUC) tracking:
+   WAUC_new = (Current_Qty * Current_WAUC + Added_Qty * Added_Price) / (Current_Qty + Added_Qty)
 """
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
@@ -18,6 +23,11 @@ from app.models import (
     StockMoveType,
     AuditLog
 )
+
+
+class InsufficientStockError(Exception):
+    """Raised when an inventory reduction exceeds available physical stock."""
+    pass
 
 
 class InventoryService:
@@ -39,11 +49,11 @@ class InventoryService:
             .filter(StockMove.item_id == item_id, StockMove.direction == StockMoveDirection.OUT)
             .scalar()
         )
-        return float(in_qty - out_qty)
+        return round(float(in_qty - out_qty), 4)
 
     def get_all_stock_balances(self) -> List[Dict]:
         """
-        Return all items with their ledger-computed stock balances and valuation.
+        Return all active items with their ledger-computed stock balances and valuations.
         """
         items = self.db.query(Item).filter(Item.is_active == True).all()
         result = []
@@ -74,19 +84,32 @@ class InventoryService:
         unit_cost: float,
         reference_type: str,
         reference_id: str,
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
+        allow_negative: bool = False
     ) -> StockMove:
         """
-        Append an immutable stock movement record and compute the running snapshot balance.
+        Append an immutable stock movement record.
+        Enforces:
+        - Quantity > 0
+        - Physical availability check on OUT movements (preventing negative inventory)
+        - Running snapshot balance recording
         """
         if quantity <= 0:
-            raise ValueError(f"Stock movement quantity must be positive, got {quantity}")
+            raise ValueError(f"Stock movement quantity must be strictly positive, got {quantity}")
 
         current_balance = self.get_stock_balance(item_id)
-        if direction == StockMoveDirection.IN:
-            new_balance = current_balance + quantity
+
+        if direction == StockMoveDirection.OUT:
+            if not allow_negative and current_balance < quantity:
+                item = self.db.query(Item).filter(Item.id == item_id).first()
+                item_name = item.name if item else f"Item #{item_id}"
+                raise InsufficientStockError(
+                    f"Insufficient stock for '{item_name}'. "
+                    f"Available balance: {current_balance} {unit}, requested issue: {quantity} {unit}."
+                )
+            new_balance = round(current_balance - quantity, 4)
         else:
-            new_balance = current_balance - quantity
+            new_balance = round(current_balance + quantity, 4)
 
         total_cost = round(quantity * unit_cost, 4)
 
@@ -130,3 +153,54 @@ class InventoryService:
         item.current_wauc = round(new_wauc, 4)
         self.db.flush()
         return item.current_wauc
+
+    def record_stock_adjustment(
+        self,
+        item_id: int,
+        target_quantity: float,
+        reason: str,
+        adjusted_by: str = "auditor"
+    ) -> StockMove:
+        """
+        Record an auditable stock adjustment or reversal movement.
+        Calculates difference and creates a signed movement without overwriting historical records.
+        """
+        current_balance = self.get_stock_balance(item_id)
+        diff = round(target_quantity - current_balance, 4)
+
+        if diff == 0:
+            raise ValueError("Target balance matches current balance; no adjustment needed.")
+
+        item = self.db.query(Item).filter(Item.id == item_id).first()
+        if not item:
+            raise ValueError(f"Item {item_id} not found")
+
+        direction = StockMoveDirection.IN if diff > 0 else StockMoveDirection.OUT
+        qty = abs(diff)
+        cost = item.current_wauc or item.standard_cost
+
+        move = self.record_stock_move(
+            item_id=item_id,
+            move_type=StockMoveType.STOCK_ADJUSTMENT,
+            direction=direction,
+            quantity=qty,
+            unit=item.unit,
+            unit_cost=cost,
+            reference_type="audit_adjustment",
+            reference_id=f"ADJ-{int(datetime.now().timestamp())}",
+            notes=f"Audit adjustment: {reason}",
+            allow_negative=False
+        )
+
+        audit = AuditLog(
+            table_name="stock_moves",
+            record_id=str(move.id),
+            action="ADJUSTMENT",
+            changed_by=adjusted_by,
+            old_values=f"Balance: {current_balance}",
+            new_values=f"Balance: {target_quantity} (Move: {direction.value} {qty})",
+            reason=reason
+        )
+        self.db.add(audit)
+        self.db.commit()
+        return move

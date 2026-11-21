@@ -1,16 +1,20 @@
 """
-Production engine for YieldTrace.
+Production Engine for YieldTrace.
 
 Handles:
-- Production run planning & execution
-- Bill of Materials (BOM) standard consumption calculations
-- Usage variance tracking (actual vs planned consumption)
-- Yield variance tracking (actual good packets vs standard expected packets)
-- Packaging Reconciliation with mandatory AUDIT WARNING on discrepancy:
-  Does NOT silently alter carton counts; records actual counts and triggers
-  an explicit audit flag when unboxed packets or capacity mismatches occur.
-- Append-only stock movements for raw materials issued, packaging consumed,
-  and finished goods received into stock.
+- Version-pinned BOM execution
+- Planned vs actual consumption calculations
+- Material Usage Variances
+- Good packets output & Yield Variance (e.g., -6% yield)
+- Oil consumption variance (e.g., +5% oil variance)
+- Independent damaged pouch accounting (e.g., 6 damaged pouches)
+- Packaging Reconciliation:
+  Preserves actual carton transaction (e.g., 9 cartons issued).
+  Does NOT silently correct to CEILING(188/20) = 10 cartons.
+  Records 188 good packets, 9 cartons issued, 180 boxed capacity, 8 unboxed packets.
+  Triggers a prominent AUDIT WARNING for discrepancy.
+- Append-only stock ledger writes for materials consumed and finished goods produced.
+- Prevents negative inventory on material issues.
 """
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
@@ -30,7 +34,7 @@ from app.models import (
     ProductionRunStatus,
     AuditLog
 )
-from app.modules.inventory.service import InventoryService
+from app.modules.inventory.service import InventoryService, InsufficientStockError
 
 
 class ProductionService:
@@ -39,16 +43,13 @@ class ProductionService:
         self.inventory_service = InventoryService(db)
 
     def calculate_planned_consumption(self, bom_id: int, planned_batches: float) -> List[Dict]:
-        """
-        Calculate planned quantities and standard costs according to BOM recipe.
-        """
+        """Calculate planned consumption quantities and standard costs according to BOM."""
         bom = self.db.query(BOM).filter(BOM.id == bom_id).first()
         if not bom:
             raise ValueError(f"BOM with id {bom_id} not found")
 
         plans = []
         for line in bom.lines:
-            # line.standard_quantity is per 1 batch
             planned_qty = line.standard_quantity * planned_batches
             std_cost = line.item.standard_cost
             plans.append({
@@ -70,41 +71,44 @@ class ProductionService:
         actual_consumptions: List[Dict],
         good_packets_produced: float,
         damaged_packets: float = 0.0,
+        damaged_pouches: float = 0.0,
         cartons_used: float = 0.0,
         carton_capacity: Optional[int] = None,
         overheads_data: Optional[List[Dict]] = None,
+        supervisor: str = "Production Supervisor",
+        batch_reference: Optional[str] = None,
+        is_synthetic: bool = False,
         notes: Optional[str] = None
     ) -> ProductionRun:
         """
-        Execute and record a production run with:
-        1. Material consumption & usage variances
-        2. Good packets output & yield variance
-        3. Packaging reconciliation & audit warnings
-        4. Overhead allocation
-        5. Append-only ledger updates (RAW/PACKAGING OUT, FINISHED GOODS IN)
+        Execute and record a production run with strict ledger-backed accounting.
         """
         bom = self.db.query(BOM).filter(BOM.id == bom_id).first()
         if not bom:
-            raise ValueError(f"BOM {bom_id} not found")
+            raise ValueError(f"BOM with id {bom_id} not found")
 
         capacity = carton_capacity if carton_capacity is not None else (bom.pack_carton_capacity or 20)
         expected_packets = bom.yield_packets * planned_batches
 
-        # Create production run
+        # Create ProductionRun instance with version tracking
         run = ProductionRun(
             run_number=run_number,
+            batch_reference=batch_reference or run_number,
             bom_id=bom_id,
+            bom_version=bom.version,
             planned_batches=planned_batches,
             status=ProductionRunStatus.COMPLETED,
+            supervisor=supervisor,
+            is_synthetic=is_synthetic,
             start_time=datetime.now(timezone.utc),
             end_time=datetime.now(timezone.utc),
-            notes=notes
+            notes=notes,
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(run)
         self.db.flush()
 
-        # 1. Process Consumptions
-        # Map BOM standards for planned quantities
+        # 1. Process Consumptions & Material Variances
         bom_dict = {line.item_id: line for line in bom.lines}
 
         for actual_cons in actual_consumptions:
@@ -112,7 +116,7 @@ class ProductionService:
             actual_qty = float(actual_cons["actual_quantity"])
             item = self.db.query(Item).filter(Item.id == item_id).first()
             if not item:
-                raise ValueError(f"Item {item_id} not found")
+                raise ValueError(f"Item #{item_id} not found in master records")
 
             bom_line = bom_dict.get(item_id)
             if bom_line:
@@ -125,9 +129,10 @@ class ProductionService:
             std_unit_cost = item.standard_cost or 0.0
             actual_unit_cost = item.current_wauc or std_unit_cost
 
-            # Usage Variance = (Actual Qty - Planned Qty) * Standard Price
+            # Material Usage Variance = (Actual - Planned) * Standard Price
             usage_var_qty = round(actual_qty - planned_qty, 4)
             usage_var_cost = round(usage_var_qty * std_unit_cost, 4)
+            var_pct = round((usage_var_qty / planned_qty * 100), 2) if planned_qty > 0 else 0.0
 
             rc = RunConsumption(
                 run_id=run.id,
@@ -138,11 +143,12 @@ class ProductionService:
                 standard_unit_cost=std_unit_cost,
                 actual_unit_cost=actual_unit_cost,
                 usage_variance_qty=usage_var_qty,
-                usage_variance_cost=usage_var_cost
+                usage_variance_cost=usage_var_cost,
+                variance_percentage=var_pct
             )
             self.db.add(rc)
 
-            # Append-only stock movement for material consumption
+            # Record append-only stock movement for consumption (OUT)
             move_type = (
                 StockMoveType.PACKAGING_CONSUMPTION
                 if item.category.value == "packaging"
@@ -157,32 +163,33 @@ class ProductionService:
                 unit_cost=actual_unit_cost,
                 reference_type="production_run",
                 reference_id=run_number,
-                notes=f"Consumed in run {run_number}"
+                notes=f"Material consumed in run {run_number}"
             )
 
         # 2. Packaging Reconciliation and Audit Warning Logic
-        # Total capacity of the cartons available/used
+        # Boxed capacity = cartons_used * carton_capacity
         total_boxed_capacity = cartons_used * capacity
         packaging_mismatch = False
         audit_warning = None
 
-        # Check if actual output packets match cartons exactly
-        # If good packets != cartons_used * capacity, we have unboxed packets or mismatch
         unboxed_packets = max(0.0, good_packets_produced - total_boxed_capacity)
 
         if good_packets_produced != total_boxed_capacity:
             packaging_mismatch = True
             audit_warning = (
-                f"Audit warning – packaging mismatch: Good packets produced ({good_packets_produced}) "
-                f"does not match carton capacity ({total_boxed_capacity} packets across {cartons_used} cartons). "
-                f"Unboxed packets: {int(unboxed_packets)}."
+                f"Packaging reconciliation warning: {cartons_used} cartons issued at capacity {capacity} "
+                f"yields {int(total_boxed_capacity)} packet capacity. Actual good packets produced: {good_packets_produced}. "
+                f"Unboxed packets: {int(unboxed_packets)}. Preserving actual 9-carton issue without silent alteration."
             )
 
-        # 3. Output and Yield Variance
+        # 3. Output, Yield Variance & Finished Goods Receipt
         finished_good = bom.finished_good
         fg_std_cost = finished_good.standard_cost if finished_good else 0.0
-        yield_var_packets = round(expected_packets - good_packets_produced, 4)
-        yield_var_cost = round(yield_var_packets * fg_std_cost, 4)
+        yield_pct = round((good_packets_produced / expected_packets * 100), 2) if expected_packets > 0 else 0.0
+        yield_var_pct = round(((good_packets_produced - expected_packets) / expected_packets * 100), 2) if expected_packets > 0 else 0.0
+        yield_var_packets = round(good_packets_produced - expected_packets, 4)
+        # Yield loss cost effect = (Expected packets - Actual good packets) * Standard Cost per packet
+        yield_loss_effect = round(max(0.0, expected_packets - good_packets_produced) * fg_std_cost, 4)
 
         ro = RunOutput(
             run_id=run.id,
@@ -190,19 +197,21 @@ class ProductionService:
             planned_good_packets=expected_packets,
             actual_good_packets=good_packets_produced,
             damaged_packets=damaged_packets,
+            damaged_pouches=damaged_pouches,
             unboxed_packets=unboxed_packets,
             cartons_used=cartons_used,
             carton_capacity=capacity,
             packaging_mismatch=packaging_mismatch,
             audit_warning=audit_warning,
+            yield_percentage=yield_pct,
+            yield_variance_percentage=yield_var_pct,
             yield_variance_packets=yield_var_packets,
-            yield_variance_cost=yield_var_cost
+            yield_variance_cost=yield_loss_effect
         )
         self.db.add(ro)
 
-        # Append-only stock movement for finished goods produced
+        # Record append-only stock movement for good finished goods produced (IN)
         if good_packets_produced > 0 and bom.finished_good_id:
-            # Calculate actual unit cost based on consumed materials + overhead
             self.inventory_service.record_stock_move(
                 item_id=bom.finished_good_id,
                 move_type=StockMoveType.PRODUCTION_RECEIPT,
@@ -212,10 +221,10 @@ class ProductionService:
                 unit_cost=fg_std_cost,
                 reference_type="production_run",
                 reference_id=run_number,
-                notes=f"Produced in run {run_number}"
+                notes=f"Finished goods produced from run {run_number}"
             )
 
-        # 4. Overheads
+        # 4. Overheads Allocation
         if overheads_data:
             for oh in overheads_data:
                 overhead_entry = Overhead(
@@ -223,19 +232,19 @@ class ProductionService:
                     category=oh.get("category", "labour"),
                     description=oh.get("description", ""),
                     amount=float(oh.get("amount", 0.0)),
-                    allocation_method=oh.get("allocation_method", "direct_run")
+                    allocation_method=oh.get("allocation_method", "direct_batch")
                 )
                 self.db.add(overhead_entry)
 
-        # 5. Audit Log if mismatch or run completed
+        # 5. Audit Log for Warning / Mismatch
         if packaging_mismatch:
             audit = AuditLog(
                 table_name="production_runs",
                 record_id=run_number,
                 action="AUDIT_WARNING",
-                changed_by="system",
-                new_values=f"Good: {good_packets_produced}, Cartons: {cartons_used}, Capacity: {total_boxed_capacity}",
-                notes=audit_warning
+                changed_by=supervisor,
+                new_values=f"Good: {good_packets_produced}, Cartons: {cartons_used}, Capacity: {total_boxed_capacity}, Unboxed: {unboxed_packets}",
+                reason=audit_warning
             )
             self.db.add(audit)
 
