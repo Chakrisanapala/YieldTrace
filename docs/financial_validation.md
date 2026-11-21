@@ -126,7 +126,7 @@ The cost bridge demonstrates how the standard BOM cost baseline transforms into 
 $$\text{Actual Batch Cost} = \text{Standard Cost} + \text{Material Price Variance} + \text{Material Usage Variance} + \text{Overhead Variance}$$
 
 1. **Standard Baseline Cost:**
-   $$\text{Std Cost} = (40 \times 40) + (10 \times 110) + (1 \times 250) + (200 \times 1.50) + (10 \times 25) + 1800 = ₹5,300.00$$
+   $$\text{Std Cost} = (40 \times 40) + (10 \times 110) + (1 \times 250) + (200 \times 1.50) + (10 \times 25) + 1800 = \mathbf{₹5,300.00}$$
 
 2. **Material Price Variance:**
    $$\text{Price Variance} = \sum (\text{Actual WAUC} - \text{Standard Price}) \times \text{Actual Quantity}$$
@@ -134,23 +134,23 @@ $$\text{Actual Batch Cost} = \text{Standard Cost} + \text{Material Price Varianc
    * Other items: WAUC equals standard cost $\implies ₹0.00$
    * **Total Price Variance:** $\mathbf{+₹75.00}$ (Unfavorable)
 
-3. **Material Usage Variance:**
+3. **Material Usage Variance (Zero Double-Counting Proof):**
    $$\text{Usage Variance} = \sum (\text{Actual Qty} - \text{Standard Qty}) \times \text{Standard Price}$$
    * Flour: $(40.0 - 40.0) \times 40.00 = ₹0.00$
    * Oil: $(10.5 - 10.0) \times 110.00 = +₹55.00$
    * Spice Mix: $(1.2 - 1.0) \times 250.00 = +₹50.00$
-   * Pouches: $(194.0 - 200.0) \times 1.50 = -₹9.00$
-   * Cartons: $(9.0 - 10.0) \times 25.00 = -₹25.00$
-   * Damaged Scrap Pouches: $6 \times 1.50 = +₹9.00$
-   * **Total Net Usage Variance:** $+55.00 + 50.00 - 9.00 - 25.00 + 9.00 = \mathbf{+₹80.00}$ (Unfavorable)
+   * Pouches: $(194.0 - 200.0) \times 1.50 = \mathbf{-₹9.00}$ *(194 actual pouches consumed includes 188 good packets + 6 damaged pouches; no auxiliary scrap charge is added to prevent double-counting)*
+   * Cartons: $(9.0 - 10.0) \times 25.00 = \mathbf{-₹25.00}$
+   * **Total Net Usage Variance:** $0.00 + 55.00 + 50.00 - 9.00 - 25.00 = \mathbf{+₹71.00}$ (Unfavorable)
 
 4. **Overhead Variance:**
    $$\text{Actual Overheads} - \text{Standard Overheads} = ₹1,800.00 - ₹1,800.00 = \mathbf{₹0.00}$$
 
 5. **Waterfall Summary:**
-   $$\text{Standard Cost (₹5,300.00)} + \text{Price Var (+₹75.00)} + \text{Usage Var (+₹80.00)} = \mathbf{₹5,455.00}$$
-   $$\text{Actual Incurred Batch Cost} = \mathbf{₹5,455.00}$$
-   $$\mathbf{\text{Discrepancy}} = ₹5,455.00 - ₹5,455.00 = \mathbf{₹0.00}$$
+   $$\text{Total Net Variance} = \text{Price Variance (+₹75.00)} + \text{Usage Variance (+₹71.00)} + \text{Overhead Variance (₹0.00)} = \mathbf{+₹146.00}$$
+   $$\text{Reconciled Actual Batch Cost} = \text{Standard Cost (₹5,300.00)} + \text{Total Variance (+₹146.00)} = \mathbf{₹5,446.00}$$
+   $$\text{Actual Incurred Batch Cost from Physical Ledger} = \mathbf{₹5,446.00}$$
+   $$\mathbf{\text{Discrepancy}} = ₹5,446.00 - ₹5,446.00 = \mathbf{₹0.0000}$$
 
 ---
 

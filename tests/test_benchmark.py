@@ -154,9 +154,14 @@ def test_canonical_nit_benchmark_complete_flow(canonical_benchmark_setup):
     cw = costing.calculate_cost_waterfall(run.id)
     assert cw["is_mathematically_reconciled"] is True
     assert cw["reconciliation_discrepancy"] == 0.00
+    assert cw["total_standard_cost"] == 5300.0
+    assert cw["total_actual_cost"] == 5446.0
+    assert cw["price_variance"] == 75.0
+    assert cw["usage_variance"] == 71.0
     assert cw["standard_overhead"] == 1800.0
     assert cw["actual_overhead"] == 1800.0
     assert cw["overhead_variance"] == 0.0
+
 
     # ----------------------------------------------------
     # Verification 5: Sales Order Retailer A (Tamil Nadu - Intra-State)

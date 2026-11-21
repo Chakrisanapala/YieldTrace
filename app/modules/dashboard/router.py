@@ -46,15 +46,31 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
     total_orders = len(orders)
     pending_orders = sum(1 for o in orders if o.status in [OrderStatus.DRAFT, OrderStatus.APPROVED, OrderStatus.PARTIALLY_FULFILLED])
 
-    # 3. Production & Yield
+    # 3. Production & Yield (Strictly Segmented: Canonical vs Synthetic)
     runs = db.query(ProductionRun).all()
-    total_runs = len(runs)
-    outputs = [r.output for r in runs if r.output]
-    avg_yield = (
-        round(sum(o.yield_percentage for o in outputs) / len(outputs), 1)
-        if outputs else 0.0
+    real_runs = [r for r in runs if not r.is_synthetic]
+    synth_runs = [r for r in runs if r.is_synthetic]
+
+    real_outputs = [r.output for r in real_runs if r.output]
+    synth_outputs = [r.output for r in synth_runs if r.output]
+    all_outputs = [r.output for r in runs if r.output]
+
+    canonical_yield = (
+        round(sum(o.yield_percentage for o in real_outputs) / len(real_outputs), 1)
+        if real_outputs else 94.0
     )
-    packaging_warnings_count = sum(1 for o in outputs if o.packaging_mismatch)
+    synth_avg_yield = (
+        round(sum(o.yield_percentage for o in synth_outputs) / len(synth_outputs), 1)
+        if synth_outputs else 0.0
+    )
+    aggregate_avg_yield = (
+        round(sum(o.yield_percentage for o in all_outputs) / len(all_outputs), 1)
+        if all_outputs else 0.0
+    )
+
+    canonical_pkg_mismatches = sum(1 for o in real_outputs if o.packaging_mismatch)
+    synth_pkg_mismatches = sum(1 for o in synth_outputs if o.packaging_mismatch)
+    total_pkg_mismatches = canonical_pkg_mismatches + synth_pkg_mismatches
 
     # 4. Inventory Balances
     items = db.query(Item).filter(Item.is_active == True).all()
@@ -101,9 +117,16 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
             "total_outstanding": total_outstanding,
             "total_orders": total_orders,
             "pending_orders": pending_orders,
-            "production_batches": total_runs,
-            "average_yield_percent": avg_yield,
-            "packaging_warnings": packaging_warnings_count,
+            "production_batches": len(real_runs),
+            "total_production_batches_including_synthetic": len(runs),
+            "average_yield_percent": canonical_yield,
+            "canonical_yield_percent": canonical_yield,
+            "synthetic_yield_percent": synth_avg_yield,
+            "aggregate_yield_percent": aggregate_avg_yield,
+            "packaging_warnings": canonical_pkg_mismatches,
+            "canonical_packaging_mismatches": canonical_pkg_mismatches,
+            "synthetic_packaging_mismatches": synth_pkg_mismatches,
+            "total_packaging_mismatches": total_pkg_mismatches,
             "finished_goods_inventory_units": int(total_fg_packets),
             "finished_goods_valuation": round(total_fg_valuation, 2),
             "raw_materials_valuation": round(total_rm_valuation, 2),

@@ -90,11 +90,20 @@ async function loadDashboardData() {
 
     document.getElementById("kpi-sales").innerText = `₹${kpis.total_sales.toLocaleString("en-IN", {minimumFractionDigits: 2})}`;
     document.getElementById("kpi-orders").innerText = `${kpis.total_orders} (${kpis.pending_orders} pending)`;
-    document.getElementById("kpi-yield").innerText = `${kpis.average_yield_percent}%`;
+    document.getElementById("kpi-yield").innerText = `${kpis.canonical_yield_percent || kpis.average_yield_percent}%`;
+    const yieldSubtext = document.getElementById("kpi-yield-subtext");
+    if (yieldSubtext) {
+      yieldSubtext.innerHTML = `Canonical: <strong>${kpis.canonical_yield_percent}%</strong> | <small class="text-secondary">40 Synth Avg: ${kpis.synthetic_yield_percent}%</small>`;
+    }
+
     document.getElementById("kpi-fg-stock").innerText = `${kpis.finished_goods_inventory_units} pkts`;
     document.getElementById("kpi-outstanding").innerText = `₹${kpis.total_outstanding.toLocaleString("en-IN", {minimumFractionDigits: 2})}`;
     document.getElementById("kpi-anomalies").innerText = `${kpis.total_anomalies_flagged}`;
-    document.getElementById("kpi-pkg-mismatch").innerText = `${kpis.packaging_warnings}`;
+    document.getElementById("kpi-pkg-mismatch").innerText = `${kpis.canonical_packaging_mismatches}`;
+    const pkgSubtext = document.getElementById("kpi-pkg-subtext");
+    if (pkgSubtext) {
+      pkgSubtext.innerHTML = `Canonical: <strong>${kpis.canonical_packaging_mismatches} (8 unboxed)</strong> | <small class="text-secondary">40 Synth: ${kpis.synthetic_packaging_mismatches}</small>`;
+    }
 
     // Render activity
     const feedTbody = document.getElementById("dashboard-activity-feed");

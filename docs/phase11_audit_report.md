@@ -143,8 +143,10 @@ The canonical benchmark scenario was independently recomputed:
   - Actual Pouches: 194 pcs @ ₹1.50 = ₹291.00 (188 good + 6 damaged)
   - Actual Cartons: 9 cartons @ ₹25.00 = ₹225.00
   - Overheads: Labour ₹1,200.00 + Gas/Electricity ₹600.00 = ₹1,800.00
-  - Total Actual Cost: ₹5,446.00 (excluding salvage) / ₹5,286.88 (with benchmark cost allocation).
-  - Mathematical Reconciliation: $\Delta = ₹0.00$.
+  - Total Actual Cost: ₹5,446.00 (Flour ₹1,675 + Oil ₹1,155 + Spice ₹300 + Pouches ₹291 + Cartons ₹225 + Overheads ₹1,800).
+  - Total Variance: +₹146.00 (Price Variance +₹75.00 + Net Usage Variance +₹71.00 + Overhead Variance ₹0.00).
+  - Mathematical Cost Waterfall Reconciliation: Standard (₹5,300.00) + Total Variance (+₹146.00) = Actual Cost (₹5,446.00), Discrepancy = ₹0.00.
+
 
 ### 6.2 Packaging Non-Coercion Audit
 - Good packets produced: 188

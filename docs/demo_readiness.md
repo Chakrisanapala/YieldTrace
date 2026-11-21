@@ -118,7 +118,8 @@ http://localhost:8000
 * **Show Evaluator:**
   1. Point to the green verification badge: **"Reconciled to ₹0.00 Paisa Precision"**.
   2. Explain the Cost Bridge:
-     $$\text{Standard Baseline Cost (₹5,300.00)} + \text{Price Var (+₹75.00)} + \text{Usage Var (+₹80.00)} = \mathbf{₹5,455.00}$$
+     $$\text{Standard Baseline Cost (₹5,300.00)} + \text{Price Var (+₹75.00)} + \text{Usage Var (+₹71.00)} = \mathbf{₹5,446.00}$$
+     *(Note: Pouch usage variance is $(194 - 200) \times ₹1.50 = -₹9.00$, where 194 includes 188 good + 6 damaged pouches, completely preventing double-counting of damaged packaging).*
   3. Show the interactive Chart.js Waterfall Bar Chart illustrating the step-by-step cost bridge from standard baseline to actual batch cost.
 
 ---
