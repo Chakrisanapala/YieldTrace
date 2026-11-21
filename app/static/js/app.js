@@ -892,6 +892,8 @@ async function switchDemoRole(role) {
 // Initialize on DOM Load
 document.addEventListener("DOMContentLoaded", async () => {
   await switchDemoRole("owner");
-  switchView("overview");
+  const urlParams = new URLSearchParams(window.location.search);
+  const viewParam = urlParams.get("view");
+  switchView(viewParam || "overview");
 });
 

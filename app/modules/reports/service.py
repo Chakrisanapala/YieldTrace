@@ -101,8 +101,8 @@ class ReportsService:
         ]
 
     def get_production_batch_report(self) -> List[Dict]:
-        """Report 7: Production Batch Performance & Yield."""
-        runs = self.db.query(ProductionRun).order_by(ProductionRun.id.desc()).all()
+        """Report 7: Production Batch Performance & Yield. Production batches appear before synthetic demo history."""
+        runs = self.db.query(ProductionRun).order_by(ProductionRun.is_synthetic.asc(), ProductionRun.id.desc()).all()
         result = []
         for r in runs:
             ro = r.output
